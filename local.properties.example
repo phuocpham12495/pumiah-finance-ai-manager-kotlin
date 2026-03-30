@@ -1,0 +1,11 @@
+## Copy file này thành local.properties và điền giá trị thực
+## File local.properties KHÔNG được commit lên git
+
+# Android SDK path (tự động tạo bởi Android Studio)
+sdk.dir=C\:\Users\YourName\AppData\Local\Android\Sdk
+
+# Supabase - lấy tại https://supabase.com/dashboard/project/_/settings/api
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+# Google Gemini - lấy tại https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
