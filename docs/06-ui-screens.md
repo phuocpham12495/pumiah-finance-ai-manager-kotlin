@@ -744,7 +744,45 @@ fun ChatBubble(message: Message) {
 
 ---
 
-## 9. ProfileScreen
+## 9. WalletScreen (v1.1)
+
+**Mục đích:** Quản lý ví cá nhân và ví chung (shared wallets) với nhiều thành viên.
+
+**Tính năng:**
+- Hiển thị danh sách ví với số dư
+- Tạo ví mới (cá nhân hoặc chung)
+- Quản lý thành viên ví chung: thêm qua email, xóa thành viên
+- Pull-to-refresh (PullToRefreshBox)
+- Xóa ví với xác nhận
+
+**Shared Wallet Transaction Badge:**
+
+Trong `TransactionListScreen`, giao dịch thuộc ví chung hiển thị badge chữ cái đầu email thay vì text dài:
+
+```kotlin
+// Badge chữ cái đầu email người tạo giao dịch
+if (transaction.createdByEmail != null) {
+    val initial = transaction.createdByEmail.first().uppercaseChar()
+    Box(
+        modifier = Modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.secondaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initial.toString(),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+}
+```
+
+---
+
+## 9b. ProfileScreen
 
 **Mục đích:** Hiển thị và chỉnh sửa thông tin cá nhân, đăng xuất.
 
@@ -813,14 +851,184 @@ fun ProfileScreen(
 
 ---
 
-## 10. Checklist UI/UX
+## 10. CategoryScreen (v1.1 — HSV Color Picker + 50 Icons)
+
+**Mục đích:** Xem, thêm, sửa, xóa danh mục chi tiêu/thu nhập cá nhân.
+
+### 10.1 HSV Color Picker
+
+Thay thế ô nhập hex text bằng color picker trực quan gồm 3 thành phần:
+
+| Thành phần | Mô tả |
+|---|---|
+| **SV Box** | Canvas 160dp — gradient ngang (Trắng→Màu hue) + dọc (Trong suốt→Đen), kéo để chọn |
+| **Hue Slider** | Canvas 24dp — rainbow gradient 12 điểm dừng, kéo để chọn sắc độ |
+| **Preset Swatches** | 15 màu cố định phổ biến để chọn nhanh |
+| **Preview bar** | Thanh hiển thị màu đã chọn + mã hex |
+
+```kotlin
+// Helper functions
+private fun Color.toHsv(): FloatArray {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(this.toArgb(), hsv)
+    return hsv
+}
+private fun hsvColor(h: Float, s: Float, v: Float): Color =
+    Color(android.graphics.Color.HSVToColor(floatArrayOf(h, s, v)))
+
+// Mở picker bằng cách nhấn vào chip màu
+Box(
+    modifier = Modifier
+        .size(width = 72.dp, height = 32.dp)
+        .clip(RoundedCornerShape(8.dp))
+        .background(selectedColor)
+        .clickable { showPicker = !showPicker },
+    contentAlignment = Alignment.Center
+) {
+    Text(
+        text = "#%06X".format(selectedColor.toArgb() and 0xFFFFFF),
+        color = if (selectedColor.luminance() > 0.4f) Color.Black else Color.White
+    )
+}
+```
+
+### 10.2 Icon Registry — 50 Icons
+
+Sử dụng `material-icons-extended`. Icons được phân nhóm:
+
+| Nhóm | Ví dụ |
+|---|---|
+| Ăn uống | Restaurant, LocalCafe, OutdoorGrill, LunchDining, EmojiFoodBeverage |
+| Mua sắm | ShoppingCart, LocalMall, Storefront, Redeem |
+| Di chuyển | DirectionsCar, DirectionsBus, Flight, LocalGasStation, TwoWheeler |
+| Nhà ở | Home, Construction, Plumbing, Lightbulb, ElectricBolt |
+| Sức khỏe | LocalHospital, Spa, FitnessCenter, HealthAndSafety |
+| Giáo dục | School, AutoStories, Psychology |
+| Giải trí | SportsEsports, Movie, MusicNote, Celebration |
+| Tài chính | AccountBalance, CreditCard, Savings, AttachMoney, TrendingUp |
+| Khác | Pets, ChildCare, BeachAccess, Diamond, Devices, ... |
+
+Icons được hiển thị trong `FlowRow` (ExperimentalLayoutApi) trong dialog:
+
+```kotlin
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun CategoryFormDialog(...) {
+    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+        // ... name, type fields ...
+        // Color chip → toggle showPicker
+        // if (showPicker) HsvColorPicker(...)
+        // Icon grid
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            categoryIcons.forEach { (key, vector) ->
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(if (selectedIcon == key) selectedColor else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { selectedIcon = key },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(vector, contentDescription = key, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+```
+
+### 10.3 Pull-to-Refresh
+
+```kotlin
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoryScreen(viewModel: CategoryViewModel = hiltViewModel()) {
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { viewModel.loadCategories() }
+    ) {
+        LazyColumn { /* category items */ }
+    }
+
+    LaunchedEffect(categoriesState) {
+        if (categoriesState !is UiState.Loading) isRefreshing = false
+    }
+}
+```
+
+---
+
+## 11. Pull-to-Refresh — Tất Cả Màn Hình
+
+Tất cả 6 màn hình chính đều dùng `PullToRefreshBox` (ExperimentalMaterial3Api):
+
+| Màn hình | ViewModel reload function |
+|---|---|
+| DashboardScreen | `loadDashboard()` |
+| TransactionListScreen | `loadTransactions()` |
+| WalletScreen | `loadWallets()` |
+| BudgetScreen | `loadBudgetsAndAll()` |
+| GoalScreen | `loadGoals()` |
+| CategoryScreen | `loadCategories()` |
+
+**Pattern chung:**
+
+```kotlin
+var isRefreshing by remember { mutableStateOf(false) }
+
+PullToRefreshBox(
+    isRefreshing = isRefreshing,
+    onRefresh = { isRefreshing = true; viewModel.reload() },
+    modifier = Modifier.padding(scaffoldPadding)
+) {
+    LazyColumn { /* content */ }
+}
+
+// Reset sau khi load xong
+LaunchedEffect(uiState) {
+    if (uiState !is UiState.Loading) isRefreshing = false
+}
+```
+
+> **Lưu ý:** Đã xóa nút Refresh khỏi TopAppBar tất cả màn hình — thay hoàn toàn bằng pull-to-refresh.
+
+---
+
+## 12. Wallet Loading Guard
+
+`BudgetViewModel` và `TransactionViewModel` có thêm `walletsLoading: StateFlow<Boolean>`:
+
+```kotlin
+private val _walletsLoading = MutableStateFlow(true)
+val walletsLoading: StateFlow<Boolean> = _walletsLoading
+
+private suspend fun loadWalletsAndAll() {
+    getWallets()           // suspend — load ví trước
+    _walletsLoading.value = false
+    loadTransactions()     // sau đó load giao dịch
+}
+```
+
+Màn hình hiển thị `CircularProgressIndicator` trong khi `walletsLoading = true` để tránh flash "Vui lòng tạo ví" trước khi ví được load.
+
+---
+
+## 13. Checklist UI/UX (v1.1)
 
 | Tiêu chí | Trạng thái |
 |---|---|
 | Loading states cho tất cả async operations | Đã implement |
 | Error messages thân thiện người dùng | Đã implement |
 | Empty states (khi không có dữ liệu) | Đã implement |
-| Pull-to-refresh | Cần thêm |
+| Pull-to-refresh (6 màn hình) | **Đã implement** |
+| Session persistence khi restart app | **Đã implement** |
+| Voice input trong Chat | **Đã implement** |
+| HSV color picker cho Category | **Đã implement** |
+| 50 icons cho Category | **Đã implement** |
+| First-letter badge ở ví chung | **Đã implement** |
+| Wallet screen + shared wallets | **Đã implement** |
 | Offline support | Chưa implement |
 | Accessibility (content descriptions) | Một phần |
 | Dark mode | Đã implement (MD3 dynamic color) |
@@ -828,4 +1036,4 @@ fun ProfileScreen(
 
 ---
 
-*Tài liệu này được tạo bởi Mentor Lập Trình Viên Cao Cấp - 2026-03-29*
+*Tài liệu này được cập nhật bởi Mentor Lập Trình Viên Cao Cấp - 2026-04-01*

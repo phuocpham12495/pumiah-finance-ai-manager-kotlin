@@ -1,8 +1,8 @@
 # 09 - Tiến Độ Học Tập và Phát Triển Kỹ Năng
 
 > **Vai trò:** Điều Phối Viên Giáo Dục
-> **Timestamp:** 2026-03-29
-> **Phiên bản tài liệu:** 1.0.0
+> **Timestamp:** 2026-04-01
+> **Phiên bản tài liệu:** 1.1.0
 
 ---
 
@@ -224,6 +224,25 @@ private fun buildPrompt(userMessage: String, context: String): String {
 | `FloatingActionButton` | Transaction, Category | Thành thạo |
 | `ListItem` | Transaction row | Khá |
 | `FilterChip` | Type selector | Cơ bản |
+| `PullToRefreshBox` | 6 màn hình chính | **Thành thạo** |
+| `FlowRow` (ExperimentalLayout) | Category icon grid | **Khá** |
+
+### 3.5 Compose Canvas & Advanced UI (v1.1)
+
+| Kỹ năng | Được áp dụng ở | Mức độ thành thạo |
+|---|---|---|
+| `Canvas` + gradient brush | HSV SV box + Hue slider | Khá |
+| `detectTapGestures` + `detectDragGestures` | Color picker tương tác | Khá |
+| `android.graphics.Color.colorToHSV()` | Chuyển đổi Color ↔ HSV | Khá |
+| Badge `CircleShape` + `Box` | Email initial badge ví chung | Thành thạo |
+
+### 3.6 Android Platform APIs (v1.1)
+
+| Kỹ năng | Được áp dụng ở | Mức độ thành thạo |
+|---|---|---|
+| `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` | Voice input ChatScreen | Khá |
+| `rememberLauncherForActivityResult` | Voice result callback | Khá |
+| `SessionStatus` flow (`awaitSessionReady`) | Session persistence | Thành thạo |
 
 ---
 
@@ -237,6 +256,7 @@ private fun buildPrompt(userMessage: String, context: String): String {
 | **Unit Testing với Turbine** | Hiện tại chưa có test coverage, cần thiết cho production | [github.com/cashapp/turbine](https://github.com/cashapp/turbine) |
 | **Compose Performance Tracing** | Chưa biết cách detect recomposition không cần thiết | [developer.android.com/jetpack/compose/performance](https://developer.android.com/jetpack/compose/performance) |
 | **Offline-first với DataStore** | App hiện tại không hoạt động offline | [developer.android.com/topic/libraries/architecture/datastore](https://developer.android.com/topic/libraries/architecture/datastore) |
+| **Android Speech Recognition** | Đã implement cơ bản, cần xử lý edge case (từ chối quyền, thiết bị không hỗ trợ) | [developer.android.com/reference/android/speech/RecognizerIntent](https://developer.android.com/reference/android/speech/RecognizerIntent) |
 
 ### 4.2 Ưu Tiên Trung Bình
 
@@ -246,7 +266,7 @@ private fun buildPrompt(userMessage: String, context: String): String {
 | **WorkManager** | Nhắc nhở tài chính định kỳ, sync background |
 | **Room Database** | Local caching cho offline support |
 | **Supabase Realtime** | Đồng bộ dữ liệu real-time giữa devices |
-| **Compose Canvas** | Vẽ biểu đồ thu chi (pie chart, bar chart) |
+| **Compose Canvas (Charts)** | Đã dùng Canvas cho HSV picker; cần học thêm drawArc/drawPath cho biểu đồ |
 
 ### 4.3 Ưu Tiên Thấp (Tương Lai)
 
@@ -263,17 +283,17 @@ private fun buildPrompt(userMessage: String, context: String): String {
 
 ### 5.1 Bài Tập Ngắn (1-2 giờ)
 
-**Bài 1: Thêm Pull-to-Refresh**
+**Bài 1: Thêm Search/Filter cho Transactions** *(Pull-to-refresh đã hoàn thành)*
 ```kotlin
-// Thêm vào TransactionListScreen
-val pullRefreshState = rememberPullToRefreshState()
-
-Box(Modifier.nestedScroll(pullRefreshState.nestedScrollConnection)) {
-    LazyColumn { ... }
-    PullToRefreshContainer(
-        state = pullRefreshState,
-        modifier = Modifier.align(Alignment.TopCenter)
-    )
+// Thêm search bar với debounce vào TransactionListScreen
+var searchQuery by remember { mutableStateOf("") }
+val filteredTransactions by remember(searchQuery, uiState.transactions) {
+    derivedStateOf {
+        if (searchQuery.isBlank()) uiState.transactions
+        else uiState.transactions.filter {
+            it.description?.contains(searchQuery, ignoreCase = true) == true
+        }
+    }
 }
 ```
 
@@ -371,96 +391,115 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
 ```json
 {
   "project": "pumiah-finance-ai-manager-kotlin",
-  "lastUpdated": "2026-03-29",
-  "overallProgress": 72,
+  "lastUpdated": "2026-04-01",
+  "overallProgress": 85,
 
   "concepts": {
     "MVVM": {
-      "understanding": 90,
-      "implementation": 85,
+      "understanding": 92,
+      "implementation": 90,
       "testing": 40,
-      "notes": "Implemented across all 8 ViewModels. Testing coverage low."
+      "notes": "Implemented across all 9 ViewModels including WalletViewModel. Testing coverage still low."
     },
     "DependencyInjection_Hilt": {
-      "understanding": 85,
-      "implementation": 90,
+      "understanding": 88,
+      "implementation": 92,
       "testing": 60,
       "notes": "Singleton scope well understood. Testing with fakes/mocks partially done."
     },
     "JetpackCompose": {
-      "understanding": 80,
-      "implementation": 85,
-      "performance": 50,
-      "notes": "Core composables mastered. Performance optimization and animations pending."
+      "understanding": 85,
+      "implementation": 90,
+      "performance": 58,
+      "notes": "Canvas API applied for HSV color picker. PullToRefreshBox and FlowRow mastered. Animations still pending."
     },
     "StateFlow_Coroutines": {
-      "understanding": 85,
-      "implementation": 90,
+      "understanding": 88,
+      "implementation": 92,
       "testing": 30,
-      "notes": "StateFlow well used. Turbine testing for flows not yet implemented."
+      "notes": "awaitSessionReady() pattern added. walletsLoading guard pattern learned. Turbine testing not yet implemented."
     },
     "SupabaseIntegration": {
-      "understanding": 80,
-      "implementation": 85,
-      "RLS_security": 80,
-      "notes": "SDK usage good. RLS configured. Realtime not yet explored."
+      "understanding": 83,
+      "implementation": 88,
+      "RLS_security": 82,
+      "notes": "Shared wallet RLS added. SessionStatus.Initializing handling implemented. Realtime not yet explored."
     },
     "GeminiAI_Integration": {
-      "understanding": 75,
-      "implementation": 70,
-      "promptEngineering": 60,
-      "notes": "Basic integration done. Context building could be improved."
+      "understanding": 78,
+      "implementation": 75,
+      "promptEngineering": 65,
+      "notes": "Voice input added via RecognizerIntent. Context building could still be improved."
     },
     "NavigationCompose": {
-      "understanding": 85,
-      "implementation": 90,
+      "understanding": 90,
+      "implementation": 92,
       "deepLinks": 0,
-      "notes": "Navigation working well. Deep links not needed yet."
+      "notes": "popUpTo(Screen.Dashboard.route) bug fixed. restoreState = false for Profile tab implemented."
+    },
+    "ComposeCanvas": {
+      "understanding": 72,
+      "implementation": 70,
+      "notes": "Applied for HSV SV box and hue slider. detectTapGestures + detectDragGestures used."
+    },
+    "AndroidPlatformAPIs": {
+      "understanding": 75,
+      "implementation": 72,
+      "notes": "RecognizerIntent for voice input. ActivityResultContracts.StartActivityForResult pattern learned."
     }
   },
 
   "skills": {
-    "Kotlin": 82,
-    "Android_Fundamentals": 78,
-    "Compose_UI": 83,
-    "REST_API": 72,
-    "Database_Design": 75,
+    "Kotlin": 85,
+    "Android_Fundamentals": 83,
+    "Compose_UI": 88,
+    "REST_API": 75,
+    "Database_Design": 78,
     "Testing": 35,
     "CI_CD": 40,
-    "Security": 70,
-    "Performance": 55,
-    "Documentation": 85
+    "Security": 73,
+    "Performance": 60,
+    "Documentation": 90
   },
 
   "completedFeatures": {
-    "count": 11,
+    "count": 23,
     "list": [
       "Authentication (Login/Register/Logout)",
+      "Session Persistence across restarts (awaitSessionReady)",
       "Dashboard with Summary Cards",
+      "Pull-to-refresh on Dashboard",
       "Transaction CRUD",
+      "Pull-to-refresh on Transactions",
+      "First-letter badge for shared wallet transactions",
       "Category Management",
+      "HSV Color Picker for categories",
+      "50 category icons (FlowRow grid)",
+      "Pull-to-refresh on Categories",
       "Budget Tracking with Progress",
+      "Pull-to-refresh on Budgets",
+      "Wallet loading guard (walletsLoading StateFlow)",
       "Goal Saving with Contributions",
+      "Pull-to-refresh on Goals",
       "AI Chatbot (Gemini)",
+      "Voice Input in Chat (RecognizerIntent vi-VN)",
+      "Wallet Screen (personal + shared wallets)",
+      "Manage shared wallet participants (add/remove)",
       "Profile Screen",
-      "Navigation with Bottom Bar",
-      "RLS Database Security",
-      "17 Default Categories Seed"
+      "Navigation with Bottom Bar (5 tabs)",
+      "Navigation bugs fixed (popUpTo, Profile restoreState)"
     ]
   },
 
   "pendingFeatures": {
-    "count": 9,
+    "count": 6,
     "list": [
-      "Pull-to-refresh",
       "Search/Filter transactions",
-      "Spending charts",
+      "Spending charts (pie, bar)",
       "CSV Export",
       "Offline support",
       "Push notifications",
-      "Unit test coverage",
-      "Integration tests",
-      "Performance optimization"
+      "Unit & Integration test coverage"
     ]
   },
 
@@ -478,7 +517,8 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
     {
       "topic": "Compose Canvas for Charts",
       "priority": "MEDIUM",
-      "estimatedLearningTime": "2 days"
+      "estimatedLearningTime": "1 day",
+      "notes": "Basic Canvas already used in HSV picker. Charts are next step."
     },
     {
       "topic": "WorkManager for Background Tasks",
@@ -496,8 +536,9 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
     "sprint1_points": 26,
     "sprint2_points": 42,
     "sprint3_points": 31,
-    "sprint4_points_estimated": 34,
-    "averageVelocity": 33
+    "sprint4_points": 47,
+    "sprint5_points_estimated": 34,
+    "averageVelocity": 37
   }
 }
 ```
@@ -538,22 +579,27 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
 
 ### 8.1 Điều Làm Tốt
 
-1. **Kiến trúc rõ ràng:** MVVM với Repository pattern được áp dụng nhất quán
+1. **Kiến trúc rõ ràng:** MVVM với Repository pattern được áp dụng nhất quán trên 9 ViewModels
 2. **Bảo mật:** API keys không bao giờ hardcode, RLS được setup đúng
 3. **Code organization:** Cấu trúc thư mục theo feature rõ ràng
 4. **Material Design 3:** UI nhất quán với MD3 components
+5. **Session persistence:** `awaitSessionReady()` giải quyết đúng root cause, không dùng workaround
+6. **Bug investigation:** Navigation `popUpTo` bug được debug đến tận nguyên nhân (Login node trong graph), không chỉ patch triệu chứng
+7. **Canvas HSV picker:** Implement trực tiếp bằng Compose Canvas thay vì thêm thư viện màu — giữ APK nhỏ
 
 ### 8.2 Điều Cần Cải Thiện
 
 1. **Testing:** Coverage gần như 0%, cần prioritize viết tests
-2. **Error handling:** Một số edge cases chưa được handle tốt
+2. **Error handling:** Edge cases voice recognition (từ chối quyền, thiết bị không hỗ trợ) chưa được handle
 3. **Performance:** Chưa profile recomposition, chưa test với large datasets
 4. **Offline support:** App hoàn toàn phụ thuộc internet
 
 ### 8.3 Quyết Định Đáng Tự Hào
 
-Sử dụng **HttpURLConnection** thay vì SDK cho Gemini là quyết định đúng - đơn giản, kiểm soát được, và không thêm dependency không cần thiết. Đây là ví dụ tốt về nguyên tắc "YAGNI" (You Ain't Gonna Need It).
+1. **HttpURLConnection cho Gemini** — không thêm dependency nặng, kiểm soát hoàn toàn request, YAGNI principle.
+2. **`sessionStatus.first { it !is SessionStatus.Initializing }`** — dùng Flow operator để chờ async event, không dùng polling/delay.
+3. **`restoreState = item.screen != Screen.Profile`** — giải quyết Category tab persist chỉ bằng một dòng logic.
 
 ---
 
-*Tài liệu này được tạo bởi Điều Phối Viên Giáo Dục - 2026-03-29*
+*Tài liệu này được cập nhật bởi Điều Phối Viên Giáo Dục - 2026-04-01*

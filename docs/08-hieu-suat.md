@@ -1,8 +1,8 @@
 # 08 - Hiệu Năng, Bảo Mật và Kế Hoạch Sprint
 
 > **Vai trò:** Kỹ Sư Hiệu Năng + Quản Lý Dự Án
-> **Timestamp:** 2026-03-29
-> **Phiên bản tài liệu:** 1.0.0
+> **Timestamp:** 2026-04-01
+> **Phiên bản tài liệu:** 1.1.0
 
 ---
 
@@ -327,22 +327,42 @@ fun validateTransaction(
 | Financial context building cho AI | 5 | Hoàn thành |
 | Profile screen | 3 | Hoàn thành |
 | Error handling & loading states | 5 | Hoàn thành |
-| UI/UX refinement | 5 | Một phần |
-| **Tổng** | **31** | **85%** |
+| UI/UX refinement | 5 | Hoàn thành |
+| **Tổng** | **31** | **100%** |
 
-### 4.4 Sprint 4: Testing & Release (Tuần 7-8)
+### 4.4 Sprint 4: Fix & Feature Polish (Tuần 7-8)
+
+**Mục tiêu:** Sửa bug, hoàn thiện tính năng, cải thiện UX
+
+| Task | Điểm | Trạng thái |
+|---|---|---|
+| Session persistence (awaitSessionReady) | 5 | **Hoàn thành** |
+| Pull-to-refresh (6 màn hình) | 8 | **Hoàn thành** |
+| Wallet screen + shared wallets | 8 | **Hoàn thành** |
+| Fix navigation popUpTo bug | 3 | **Hoàn thành** |
+| Voice input trong Chat | 5 | **Hoàn thành** |
+| HSV color picker cho Category | 5 | **Hoàn thành** |
+| 50 category icons | 3 | **Hoàn thành** |
+| First-letter badge ở ví chung | 2 | **Hoàn thành** |
+| Xóa nút Refresh, dùng pull-to-refresh | 2 | **Hoàn thành** |
+| Wallet loading guard (walletsLoading) | 3 | **Hoàn thành** |
+| Fix remove participant ví chung | 2 | **Hoàn thành** |
+| App name → "Pumiah Finance AI Manager" | 1 | **Hoàn thành** |
+| **Tổng** | **47** | **100%** |
+
+### 4.5 Sprint 5: Testing & Release (Tuần 9-10)
 
 **Mục tiêu:** Kiểm thử và chuẩn bị release
 
 | Task | Điểm | Trạng thái |
 |---|---|---|
-| Unit tests cho ViewModels | 8 | Đang làm |
+| Unit tests cho ViewModels | 8 | Chưa bắt đầu |
 | Integration tests Supabase | 5 | Chưa bắt đầu |
 | CI/CD GitHub Actions setup | 5 | Chưa bắt đầu |
 | Performance profiling | 3 | Chưa bắt đầu |
 | Security audit | 5 | Chưa bắt đầu |
-| Documentation | 8 | Đang làm |
-| **Tổng** | **34** | **20%** |
+| Documentation cập nhật | 8 | **Đang làm** |
+| **Tổng** | **34** | **10%** |
 
 ---
 
@@ -412,4 +432,4 @@ class PumiahApplication : Application() {
 
 ---
 
-*Tài liệu này được tạo bởi Kỹ Sư Hiệu Năng + Quản Lý Dự Án - 2026-03-29*
+*Tài liệu này được cập nhật bởi Kỹ Sư Hiệu Năng + Quản Lý Dự Án - 2026-04-01*
