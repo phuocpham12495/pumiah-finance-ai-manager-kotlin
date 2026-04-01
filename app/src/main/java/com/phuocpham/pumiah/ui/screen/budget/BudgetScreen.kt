@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,15 +31,20 @@ fun BudgetScreen(viewModel: BudgetViewModel = hiltViewModel()) {
     val budgetsState by viewModel.budgets.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val wallets by viewModel.wallets.collectAsState()
+    val walletsLoading by viewModel.walletsLoading.collectAsState()
     val selectedWalletId by viewModel.selectedWalletId.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     var showForm by remember { mutableStateOf(false) }
     var editingBudget by remember { mutableStateOf<Budget?>(null) }
     var expandedWallet by remember { mutableStateOf(false) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(saveState) {
         if (saveState is UiState.Success) { showForm = false; editingBudget = null; viewModel.resetSaveState() }
+    }
+    LaunchedEffect(budgetsState) {
+        if (budgetsState !is UiState.Loading) isRefreshing = false
     }
 
     Scaffold(
@@ -49,6 +55,12 @@ fun BudgetScreen(viewModel: BudgetViewModel = hiltViewModel()) {
             }
         }
     ) { padding ->
+        if (walletsLoading) {
+            Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
         if (wallets.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
                 Text("Vui lòng tạo ví trước khi thêm ngân sách",
@@ -58,7 +70,12 @@ fun BudgetScreen(viewModel: BudgetViewModel = hiltViewModel()) {
             }
             return@Scaffold
         }
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.loadAll() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             // Wallet selector
             if (wallets.isNotEmpty()) {
                 ExposedDropdownMenuBox(
@@ -114,6 +131,7 @@ fun BudgetScreen(viewModel: BudgetViewModel = hiltViewModel()) {
                 else -> {}
             }
         }
+        } // end PullToRefreshBox
     }
 
     // Delete confirmation

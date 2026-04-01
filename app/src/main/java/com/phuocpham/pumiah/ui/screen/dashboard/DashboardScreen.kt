@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,21 +55,24 @@ fun DashboardScreen(
     val wallets by viewModel.wallets.collectAsState()
     val selectedWalletId by viewModel.selectedWalletId.collectAsState()
     var expandedWallet by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(summaryState) {
+        if (summaryState !is UiState.Loading) isRefreshing = false
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Tổng quan", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { viewModel.loadData() }) {
-                        Icon(Icons.Default.Refresh, "Làm mới")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("Tổng quan", fontWeight = FontWeight.Bold) })
         }
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.loadData() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Wallet selector + period chips
@@ -198,6 +202,7 @@ fun DashboardScreen(
 
             item { Spacer(Modifier.height(16.dp)) }
         }
+        } // end PullToRefreshBox
     }
 }
 

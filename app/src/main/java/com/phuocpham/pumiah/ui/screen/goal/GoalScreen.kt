@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,9 +35,13 @@ fun GoalScreen(viewModel: GoalViewModel = hiltViewModel()) {
     var showForm by remember { mutableStateOf(false) }
     var contributionGoal by remember { mutableStateOf<Goal?>(null) }
     var pendingDeleteGoal by remember { mutableStateOf<Goal?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(saveState) {
         if (saveState is UiState.Success) { showForm = false; viewModel.resetSaveState() }
+    }
+    LaunchedEffect(goalsState) {
+        if (goalsState !is UiState.Loading) isRefreshing = false
     }
 
     Scaffold(
@@ -45,17 +50,22 @@ fun GoalScreen(viewModel: GoalViewModel = hiltViewModel()) {
             FloatingActionButton(onClick = { showForm = true }) { Icon(Icons.Default.Add, null) }
         }
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.loadGoals() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
         when (val state = goalsState) {
             is UiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is UiState.Success -> {
                 if (state.data.isEmpty()) {
-                    Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
                         Text("Chưa có mục tiêu nào",
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                 } else {
                     LazyColumn(
-                        Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                        Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         item { Spacer(Modifier.height(4.dp)) }
@@ -70,11 +80,12 @@ fun GoalScreen(viewModel: GoalViewModel = hiltViewModel()) {
                     }
                 }
             }
-            is UiState.Error -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+            is UiState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Text(state.message, color = MaterialTheme.colorScheme.error)
             }
             else -> {}
         }
+        } // end PullToRefreshBox
     }
 
     if (showForm) {

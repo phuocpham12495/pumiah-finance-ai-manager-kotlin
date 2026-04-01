@@ -9,9 +9,12 @@ import com.phuocpham.pumiah.data.repository.GoalRepository
 import com.phuocpham.pumiah.data.repository.ProfileRepository
 import com.phuocpham.pumiah.data.repository.TransactionRepository
 import com.phuocpham.pumiah.data.repository.WalletRepository
+import android.content.Context
+import com.phuocpham.pumiah.data.session.SharedPrefsSessionManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
@@ -26,11 +29,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): SupabaseClient = createSupabaseClient(
+    fun provideSupabaseClient(@ApplicationContext context: Context): SupabaseClient = createSupabaseClient(
         supabaseUrl = BuildConfig.SUPABASE_URL,
         supabaseKey = BuildConfig.SUPABASE_ANON_KEY
     ) {
-        install(Auth)
+        install(Auth) {
+            sessionManager = SharedPrefsSessionManager(context)
+        }
         install(Postgrest)
         install(Storage)
     }

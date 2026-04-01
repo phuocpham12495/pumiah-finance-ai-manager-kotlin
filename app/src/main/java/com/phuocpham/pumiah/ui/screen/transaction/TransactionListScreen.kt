@@ -1,8 +1,10 @@
 package com.phuocpham.pumiah.ui.screen.transaction
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -10,9 +12,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,11 +42,13 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
     val transactionsState by viewModel.transactions.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val wallets by viewModel.wallets.collectAsState()
+    val walletsLoading by viewModel.walletsLoading.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
 
     var showForm by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     val selectedWalletId by viewModel.selectedWalletId.collectAsState()
     var expandedWalletFilter by remember { mutableStateOf(false) }
@@ -59,6 +66,9 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
             viewModel.resetSaveState()
         }
     }
+    LaunchedEffect(transactionsState) {
+        if (transactionsState !is UiState.Loading) isRefreshing = false
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Giao dịch", fontWeight = FontWeight.Bold) }) },
@@ -70,6 +80,12 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
             }
         }
     ) { padding ->
+        if (walletsLoading) {
+            Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
         if (wallets.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
                 Text("Vui lòng tạo ví trước khi thêm giao dịch",
@@ -79,7 +95,12 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
             }
             return@Scaffold
         }
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.loadAll() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             // Filter bar
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -165,12 +186,15 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             item { Spacer(Modifier.height(4.dp)) }
-                            items(filtered, key = { it.id }) { t ->
-                                TransactionItem(
-                                    transaction = t,
-                                    onEdit = { editingTransaction = t; showForm = true },
-                                    onDelete = { pendingDeleteId = t.id }
-                                )
+                            val currentUserId = viewModel.currentUserId
+                    items(filtered, key = { it.id }) { t ->
+                        val isOwn = t.userId == currentUserId
+                        TransactionItem(
+                            transaction = t,
+                            canEditDelete = isOwn,
+                            onEdit = { editingTransaction = t; showForm = true },
+                            onDelete = { pendingDeleteId = t.id }
+                        )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
                         }
@@ -182,6 +206,7 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
                 else -> {}
             }
         }
+        } // end PullToRefreshBox
     }
 
     if (pendingDeleteId != null) {
@@ -218,7 +243,7 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
 }
 
 @Composable
-fun TransactionItem(transaction: Transaction, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun TransactionItem(transaction: Transaction, canEditDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
     val isIncome = transaction.type == "income"
     val amountColor = if (isIncome) Green else Red
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -230,17 +255,35 @@ fun TransactionItem(transaction: Transaction, onEdit: () -> Unit, onDelete: () -
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(transaction.transactionDate.take(10), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     if (transaction.walletId != null) {
-                        Text("• Ví chung", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                        val walletLabel = transaction.walletName ?: "Ví chung"
+                        Text("• $walletLabel", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    }
+                    if (transaction.createdByEmail != null) {
+                        val initial = transaction.createdByEmail.first().uppercaseChar()
+                        Box(
+                            modifier = Modifier.size(16.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = initial.toString(),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
             }
             Text(formatVndSigned(transaction.amount, isIncome),
                 color = amountColor, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = 8.dp))
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+            if (canEditDelete) {
+                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }

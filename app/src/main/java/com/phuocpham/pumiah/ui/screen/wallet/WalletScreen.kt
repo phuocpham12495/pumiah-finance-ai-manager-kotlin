@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
     var pendingDeleteWallet by remember { mutableStateOf<Wallet?>(null) }
     var pendingLeaveWallet by remember { mutableStateOf<Wallet?>(null) }
     var pendingRemoveUserId by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(actionState) {
         if (actionState is UiState.Success) {
@@ -39,17 +41,13 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
             viewModel.resetActionState()
         }
     }
+    LaunchedEffect(walletsState) {
+        if (walletsState !is UiState.Loading) isRefreshing = false
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Ví của tôi", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { viewModel.loadWallets() }) {
-                        Icon(Icons.Default.Refresh, "Làm mới")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("Ví của tôi", fontWeight = FontWeight.Bold) })
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
@@ -57,13 +55,18 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
             }
         }
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.loadWallets() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
         when (val state = walletsState) {
             is UiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 CircularProgressIndicator()
             }
             is UiState.Success -> {
                 if (state.data.isEmpty()) {
-                    Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.AccountBalanceWallet, null,
                                 modifier = Modifier.size(64.dp),
@@ -78,7 +81,7 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
                     }
                 } else {
                     LazyColumn(
-                        Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                        Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         item { Spacer(Modifier.height(4.dp)) }
@@ -94,12 +97,12 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
                     }
                 }
             }
-            is UiState.Error -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+            is UiState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Text(state.message, color = MaterialTheme.colorScheme.error)
             }
             else -> {}
         }
-
+        } // end PullToRefreshBox
     }
 
     if (showCreateDialog) {
@@ -164,6 +167,7 @@ fun WalletScreen(viewModel: WalletViewModel = hiltViewModel()) {
                     onClick = {
                         selectedWallet?.let { viewModel.removeParticipant(it.id, userId) }
                         pendingRemoveUserId = null
+                        selectedWallet = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Xóa") }

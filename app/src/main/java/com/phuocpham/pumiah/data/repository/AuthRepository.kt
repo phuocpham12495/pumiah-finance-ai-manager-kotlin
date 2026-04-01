@@ -3,7 +3,9 @@ package com.phuocpham.pumiah.data.repository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
@@ -38,4 +40,8 @@ class AuthRepository @Inject constructor(private val client: SupabaseClient) {
     }
 
     fun isLoggedIn(): Boolean = client.auth.currentUserOrNull() != null
+
+    suspend fun awaitSessionReady() {
+        client.auth.sessionStatus.first { it !is SessionStatus.Initializing }
+    }
 }

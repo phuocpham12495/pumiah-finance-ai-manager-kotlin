@@ -1,5 +1,10 @@
 package com.phuocpham.pumiah.ui.screen.chat
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +39,17 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
     val listState = rememberLazyListState()
     var showClearConfirm by remember { mutableStateOf(false) }
 
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val text = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!text.isNullOrBlank()) inputText = text
+        }
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
@@ -49,6 +66,20 @@ fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
         bottomBar = {
             Row(modifier = Modifier.padding(12.dp).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Nói câu hỏi của bạn...")
+                        }
+                        speechLauncher.launch(intent)
+                    },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(50))
+                        .size(48.dp)
+                ) {
+                    Icon(Icons.Default.Mic, "Nhập giọng nói", tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
                 OutlinedTextField(
                     value = inputText, onValueChange = { inputText = it },
                     placeholder = { Text("Hỏi PFAM AI...") },

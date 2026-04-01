@@ -18,7 +18,17 @@ class AuthViewModel @Inject constructor(
     private val _authState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val authState: StateFlow<UiState<Unit>> = _authState
 
+    private val _sessionReady = MutableStateFlow(false)
+    val sessionReady: StateFlow<Boolean> = _sessionReady
+
     val isLoggedIn: Boolean get() = authRepository.isLoggedIn()
+
+    init {
+        viewModelScope.launch {
+            authRepository.awaitSessionReady()
+            _sessionReady.value = true
+        }
+    }
 
     fun signIn(email: String, password: String) {
         viewModelScope.launch {

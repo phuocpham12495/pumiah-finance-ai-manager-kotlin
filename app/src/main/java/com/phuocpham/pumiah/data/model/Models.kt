@@ -46,7 +46,9 @@ data class Transaction(
     val notes: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     // Joined fields (not in DB — populated client-side)
-    val category: Category? = null
+    val category: Category? = null,
+    val walletName: String? = null,
+    val createdByEmail: String? = null
 )
 
 // ─── Budget ───────────────────────────────────────────────────────────────────

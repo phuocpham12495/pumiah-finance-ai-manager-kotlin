@@ -29,6 +29,7 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var showConfirmPassword by remember { mutableStateOf(false) }
     var passwordError by remember { mutableStateOf("") }
     var registerDone by remember { mutableStateOf(false) }
 
@@ -84,7 +85,12 @@ fun RegisterScreen(
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(value = confirmPassword, onValueChange = { confirmPassword = it; passwordError = "" },
             label = { Text("Xác nhận mật khẩu") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                    Icon(if (showConfirmPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, null)
+                }
+            },
             isError = passwordError.isNotEmpty(),
             supportingText = if (passwordError.isNotEmpty()) {{ Text(passwordError) }} else null,
             modifier = Modifier.fillMaxWidth())

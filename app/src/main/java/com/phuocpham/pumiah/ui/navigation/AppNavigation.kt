@@ -1,10 +1,13 @@
 package com.phuocpham.pumiah.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -44,9 +47,16 @@ data class BottomNavItem(val screen: Screen, val label: String, val icon: @Compo
 fun AppNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
-    val startDestination = remember {
-        if (authViewModel.isLoggedIn) Screen.Dashboard.route else Screen.Login.route
+    val sessionReady by authViewModel.sessionReady.collectAsState()
+
+    if (!sessionReady) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
+
+    val startDestination = if (authViewModel.isLoggedIn) Screen.Dashboard.route else Screen.Login.route
 
     val bottomNavItems = listOf(
         BottomNavItem(Screen.Dashboard, "Tổng quan") { Icon(Icons.Default.Home, null) },
@@ -77,9 +87,12 @@ fun AppNavigation() {
                             selected = navBackStackEntry?.destination?.hierarchy?.any { it.route == item.screen.route } == true,
                             onClick = {
                                 navController.navigate(item.screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    // Always pop to Dashboard (the authenticated home), not findStartDestination()
+                                    // which could return Login node when graph startDestination is login
+                                    popUpTo(Screen.Dashboard.route) { saveState = true }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    // Profile tab never restores saved state so sub-screens (Categories, Budgets, Goals) are cleared
+                                    restoreState = item.screen != Screen.Profile
                                 }
                             }
                         )

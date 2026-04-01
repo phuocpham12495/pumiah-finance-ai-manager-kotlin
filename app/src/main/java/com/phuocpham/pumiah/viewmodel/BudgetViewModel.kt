@@ -33,6 +33,9 @@ class BudgetViewModel @Inject constructor(
     private val _wallets = MutableStateFlow<List<Wallet>>(emptyList())
     val wallets: StateFlow<List<Wallet>> = _wallets
 
+    private val _walletsLoading = MutableStateFlow(true)
+    val walletsLoading: StateFlow<Boolean> = _walletsLoading
+
     private val _selectedWalletId = MutableStateFlow<String?>(null)
     val selectedWalletId: StateFlow<String?> = _selectedWalletId
 
@@ -47,6 +50,7 @@ class BudgetViewModel @Inject constructor(
                 _wallets.value = list
                 _selectedWalletId.value = DashboardViewModel.defaultWallet(list)
             }
+            _walletsLoading.value = false
             categoryRepository.getCategories()
                 .onSuccess { _categories.value = it.filter { c -> c.type != "income" } }
             loadBudgets()

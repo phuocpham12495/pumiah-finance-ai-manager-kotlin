@@ -6,6 +6,7 @@ import com.phuocpham.pumiah.data.model.Category
 import com.phuocpham.pumiah.data.model.Transaction
 import com.phuocpham.pumiah.data.model.UiState
 import com.phuocpham.pumiah.data.model.Wallet
+import com.phuocpham.pumiah.data.repository.AuthRepository
 import com.phuocpham.pumiah.data.repository.CategoryRepository
 import com.phuocpham.pumiah.data.repository.TransactionRepository
 import com.phuocpham.pumiah.data.repository.WalletRepository
@@ -19,7 +20,8 @@ import javax.inject.Inject
 class TransactionViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
-    private val walletRepository: WalletRepository
+    private val walletRepository: WalletRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _transactions = MutableStateFlow<UiState<List<Transaction>>>(UiState.Idle)
@@ -31,11 +33,16 @@ class TransactionViewModel @Inject constructor(
     private val _wallets = MutableStateFlow<List<Wallet>>(emptyList())
     val wallets: StateFlow<List<Wallet>> = _wallets
 
+    private val _walletsLoading = MutableStateFlow(true)
+    val walletsLoading: StateFlow<Boolean> = _walletsLoading
+
     private val _selectedWalletId = MutableStateFlow<String?>(null)
     val selectedWalletId: StateFlow<String?> = _selectedWalletId
 
     private val _saveState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val saveState: StateFlow<UiState<Unit>> = _saveState
+
+    val currentUserId: String? get() = authRepository.currentUser?.id
 
     init { loadWalletsAndAll() }
 
@@ -46,6 +53,7 @@ class TransactionViewModel @Inject constructor(
                 _wallets.value = list
                 _selectedWalletId.value = DashboardViewModel.defaultWallet(list)
             }
+            _walletsLoading.value = false
             categoryRepository.getCategories().onSuccess { _categories.value = it }
             loadTransactions()
         }

@@ -37,7 +37,29 @@ class TransactionRepository @Inject constructor(private val client: SupabaseClie
             .decodeList<com.phuocpham.pumiah.data.model.Category>()
         val catMap = categories.associateBy { it.id }
 
-        transactions.map { it.copy(category = catMap[it.categoryId]) }
+        // Fetch wallets for name lookup
+        val walletIds = transactions.mapNotNull { it.walletId }.toSet()
+        val walletMap = if (walletIds.isNotEmpty()) {
+            client.postgrest["wallets"].select()
+                .decodeList<com.phuocpham.pumiah.data.model.Wallet>()
+                .associateBy({ it.id }, { it.name })
+        } else emptyMap()
+
+        // Fetch user emails for transactions in shared wallets
+        val sharedUserIds = transactions.filter { it.walletId != null }.map { it.userId }.toSet()
+        val emailMap = if (sharedUserIds.isNotEmpty()) {
+            client.postgrest["users"].select()
+                .decodeList<com.phuocpham.pumiah.data.model.UserProfile>()
+                .associateBy({ it.id }, { it.email })
+        } else emptyMap()
+
+        transactions.map { t ->
+            t.copy(
+                category = catMap[t.categoryId],
+                walletName = t.walletId?.let { walletMap[it] },
+                createdByEmail = if (t.walletId != null) emailMap[t.userId] else null
+            )
+        }
     }
 
     suspend fun createTransaction(
