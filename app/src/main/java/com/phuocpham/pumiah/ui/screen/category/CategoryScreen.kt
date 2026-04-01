@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -240,213 +241,81 @@ fun CategoryScreen(viewModel: CategoryViewModel = hiltViewModel()) {
         )
     }
 
-    if (pendingDeleteId != null) {
-        AlertDialog(
-            onDismissRequest = { pendingDeleteId = null },
-            title = { Text("Xác nhận xóa") },
-            text = { Text("Bạn có chắc muốn xóa danh mục \"$pendingDeleteName\"?\nLưu ý: không thể xóa nếu đang dùng trong giao dịch hoặc ngân sách.") },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.deleteCategory(pendingDeleteId!!); pendingDeleteId = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Xóa") }
-            },
-            dismissButton = { TextButton(onClick = { pendingDeleteId = null }) { Text("Huỷ") } }
-        )
-    }
-
     errorMessage?.let { msg ->
         AlertDialog(
             onDismissRequest = { errorMessage = null },
-            title = { Text("Không thể xóa") },
+            title = { Text("Lỗi") },
             text = { Text(msg) },
-            confirmButton = { TextButton(onClick = { errorMessage = null }) { Text("Đóng") } }
+            confirmButton = { TextButton(onClick = { errorMessage = null }) { Text("OK") } }
+        )
+    }
+
+    pendingDeleteId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("Xoá danh mục") },
+            text = { Text("Bạn có chắc chắn muốn xoá danh mục '$pendingDeleteName'? Thao tác này không thể hoàn tác.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteCategory(id); pendingDeleteId = null }) {
+                    Text("Xoá", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) { Text("Huỷ") }
+            }
         )
     }
 }
 
-// ── Category list item ────────────────────────────────────────────────────────
-
 @Composable
 fun CategoryItem(category: Category, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val color = runCatching { Color(android.graphics.Color.parseColor(category.color)) }.getOrDefault(MaterialTheme.colorScheme.primary)
-    val iconVector = iconVectorFor(category.icon)
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onEdit() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(color.copy(alpha = 0.2f)),
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(android.graphics.Color.parseColor(category.color))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(iconVector, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = iconVectorFor(category.icon),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(category.name, fontWeight = FontWeight.Medium)
-                Text(
-                    when (category.type) { "income" -> "Thu nhập"; "expense" -> "Chi tiêu"; else -> "Tất cả" },
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+                Text(category.name, fontWeight = FontWeight.Bold)
+                Text(if (category.type == "expense") "Chi tiêu" else "Thu nhập",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
-            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
             }
         }
     }
 }
 
-// ── HSV Color Picker ──────────────────────────────────────────────────────────
-
-@Composable
-fun HsvColorPicker(
-    color: Color,
-    onColorChange: (Color) -> Unit
-) {
-    val initialHsv = remember(color) { color.toHsv() }
-    var hue by remember { mutableStateOf(initialHsv[0]) }
-    var sat by remember { mutableStateOf(initialHsv[1]) }
-    var value by remember { mutableStateOf(initialHsv[2]) }
-
-    val hueColor = hsvColor(hue, 1f, 1f)
-    val currentColor = hsvColor(hue, sat, value)
-
-    LaunchedEffect(hue, sat, value) { onColorChange(currentColor) }
-
-    var svSize by remember { mutableStateOf(IntSize.Zero) }
-    var hueSize by remember { mutableStateOf(IntSize.Zero) }
-
-    val presetColors = listOf(
-        "#6C5CE7", "#00B894", "#FDCB6E", "#E17055", "#74B9FF",
-        "#FD79A8", "#00CEC9", "#636E72", "#D63031", "#E84393",
-        "#F9CA24", "#6AB04C", "#22A6B3", "#BE2EDD", "#4834D4"
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Preset quick swatches
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(presetColors) { c ->
-                val parsed = runCatching { Color(android.graphics.Color.parseColor(c)) }.getOrDefault(Color.Gray)
-                val isSelected = currentColor.toArgb() == parsed.toArgb()
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(parsed)
-                        .then(if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                        .clickable {
-                            val hsv = parsed.toHsv()
-                            hue = hsv[0]; sat = hsv[1]; value = hsv[2]
-                        }
-                )
-            }
-        }
-
-        // SV picker (2D gradient canvas)
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .onSizeChanged { svSize = it }
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        if (svSize.width > 0 && svSize.height > 0) {
-                            sat = (offset.x / svSize.width).coerceIn(0f, 1f)
-                            value = (1f - offset.y / svSize.height).coerceIn(0f, 1f)
-                        }
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        if (svSize.width > 0 && svSize.height > 0) {
-                            sat = (change.position.x / svSize.width).coerceIn(0f, 1f)
-                            value = (1f - change.position.y / svSize.height).coerceIn(0f, 1f)
-                        }
-                    }
-                }
-        ) {
-            // White → hue (horizontal saturation)
-            drawRect(brush = Brush.horizontalGradient(listOf(Color.White, hueColor)))
-            // Transparent → black (vertical value)
-            drawRect(brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
-            // Selector circle
-            val cx = sat * size.width
-            val cy = (1f - value) * size.height
-            drawCircle(Color.White, radius = 10.dp.toPx(), center = Offset(cx, cy))
-            drawCircle(Color.Black, radius = 8.dp.toPx(), center = Offset(cx, cy), style = Stroke(2.dp.toPx()))
-        }
-
-        // Hue slider
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .onSizeChanged { hueSize = it }
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        if (hueSize.width > 0)
-                            hue = (offset.x / hueSize.width * 360f).coerceIn(0f, 360f)
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        if (hueSize.width > 0)
-                            hue = (change.position.x / hueSize.width * 360f).coerceIn(0f, 360f)
-                    }
-                }
-        ) {
-            // Hue rainbow gradient
-            val hueColors = (0..12).map { hsvColor(it * 30f, 1f, 1f) }
-            drawRect(brush = Brush.horizontalGradient(hueColors))
-            // Hue selector circle
-            val cx = hue / 360f * size.width
-            val cy = size.height / 2f
-            drawCircle(Color.White, radius = cy, center = Offset(cx, cy))
-            drawCircle(Color.Black, radius = cy - 2, center = Offset(cx, cy), style = Stroke(2f))
-        }
-
-        // Color preview bar
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(currentColor)
-            )
-            Text(
-                text = "#%06X".format(currentColor.toArgb() and 0xFFFFFF),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-// ── Category form dialog ──────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CategoryFormDialog(
     category: Category?,
     onDismiss: () -> Unit,
-    onSave: (name: String, color: String, icon: String, type: String) -> Unit,
+    onSave: (String, String, String, String) -> Unit,
     isLoading: Boolean
 ) {
     val isEdit = category != null
     var name by remember { mutableStateOf(category?.name ?: "") }
-    var selectedColor by remember {
-        val c = runCatching { Color(android.graphics.Color.parseColor(category?.color ?: "#6C5CE7")) }.getOrDefault(Color(0xFF6C5CE7))
-        mutableStateOf(c)
-    }
-    var selectedIcon by remember { mutableStateOf(category?.icon ?: "attach_money") }
+    var selectedColor by remember { mutableStateOf(category?.let { Color(android.graphics.Color.parseColor(it.color)) } ?: Color.Blue) }
+    var selectedIcon by remember { mutableStateOf(category?.icon ?: "restaurant") }
     var selectedType by remember { mutableStateOf(category?.type ?: "expense") }
+
     var showPicker by remember { mutableStateOf(false) }
 
     val colorHex = "#%06X".format(selectedColor.toArgb() and 0xFFFFFF)
@@ -557,4 +426,80 @@ fun CategoryFormDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Huỷ") } }
     )
+}
+
+@Composable
+fun HsvColorPicker(
+    color: Color,
+    onColorChange: (Color) -> Unit
+) {
+    val hsv = remember(color) { color.toHsv() }
+    var hue by remember { mutableStateOf(hsv[0]) }
+    var saturation by remember { mutableStateOf(hsv[1]) }
+    var value by remember { mutableStateOf(hsv[2]) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Hue bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red
+                        )
+                    )
+                )
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        hue = (offset.x / size.width) * 360f
+                        onColorChange(hsvColor(hue, saturation, value))
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        hue = (change.position.x / size.width).coerceIn(0f, 1f) * 360f
+                        onColorChange(hsvColor(hue, saturation, value))
+                    }
+                }
+        )
+
+        // Saturation & Value area
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White, Color.Transparent)
+                    )
+                )
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, hsvColor(hue, 1f, 1f))
+                    )
+                )
+                .background(Color.Black.copy(alpha = 1f - value))
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        saturation = (offset.x / size.width).coerceIn(0f, 1f)
+                        value = 1f - (offset.y / size.height).coerceIn(0f, 1f)
+                        onColorChange(hsvColor(hue, saturation, value))
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        saturation = (change.position.x / size.width).coerceIn(0f, 1f)
+                        value = 1f - (change.position.y / size.height).coerceIn(0f, 1f)
+                        onColorChange(hsvColor(hue, saturation, value))
+                    }
+                }
+        )
+    }
 }

@@ -1,8 +1,8 @@
 # 02 - Kiểm Toán Kiến Trúc: Pumiah Finance AI Manager
 
 > **Vai trò:** Kiểm Toán Kiến Trúc
-> **Timestamp:** 2026-03-29
-> **Phiên bản tài liệu:** 1.0.0
+> **Timestamp:** 2026-04-01
+> **Phiên bản tài liệu:** 1.1.0
 
 ---
 
@@ -313,6 +313,87 @@ class TransactionViewModel @Inject constructor(
 | Coroutine integration | Native | Cần extension |
 | Compose support | `collectAsState()` | `observeAsState()` |
 | Testing | Dễ hơn | Cần CoroutineScope |
+
+---
+
+### ADR-007: Session Persistence qua `awaitSessionReady()`
+
+**Ngày quyết định:** Tháng 4/2026
+**Trạng thái:** Được chấp nhận
+
+#### Bối cảnh
+Khi app khởi động lại, `client.auth.currentUserOrNull()` trả về `null` ngay lập tức vì Supabase SDK chưa hoàn tất việc load session từ `SharedPrefsSessionManager`. Điều này khiến app hiển thị màn hình Login dù người dùng đã đăng nhập trước đó.
+
+#### Quyết định
+Thêm hàm `awaitSessionReady()` trong `AuthRepository` dùng `sessionStatus.first { it !is SessionStatus.Initializing }` để chờ SDK hoàn tất khởi tạo bất đồng bộ. `AppNavigation` chỉ render `NavHost` sau khi `sessionReady = true`.
+
+```kotlin
+// AuthRepository.kt
+suspend fun awaitSessionReady() {
+    client.auth.sessionStatus.first { it !is SessionStatus.Initializing }
+}
+
+// AuthViewModel.kt
+private val _sessionReady = MutableStateFlow(false)
+val sessionReady: StateFlow<Boolean> = _sessionReady
+
+init {
+    viewModelScope.launch {
+        authRepository.awaitSessionReady()
+        _sessionReady.value = true
+    }
+}
+
+// AppNavigation.kt
+val sessionReady by authViewModel.sessionReady.collectAsState()
+if (!sessionReady) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+    return
+}
+val startDestination = if (authViewModel.isLoggedIn) Screen.Dashboard.route else Screen.Login.route
+```
+
+#### Lý do
+- `currentUserOrNull()` là synchronous, trả về null trước khi async session load xong
+- `SessionStatus.Initializing` là trạng thái transient — flow đảm bảo chỉ proceed khi đã resolve
+- Import đúng: `io.github.jan.supabase.auth.status.SessionStatus` (không phải `io.github.jan.supabase.auth.SessionStatus`)
+- Splash indicator thay thế splash screen riêng: đơn giản hơn, không cần Activity thêm
+
+#### Hệ quả
+- App hiển thị `CircularProgressIndicator` ngắn (~100-300ms) khi cold start
+- Đăng nhập được duy trì qua mọi lần restart app
+- `startDestination` được xác định động thay vì hardcode
+
+#### Thay thế đã xem xét
+- **SplashScreen API:** Phức tạp hơn, cần Activity riêng hoặc XML theme
+- **DataStore cache userID:** Lưu trạng thái đăng nhập vào DataStore; nhưng vẫn cần đồng bộ với Supabase session thực
+
+---
+
+### ADR-008: `popUpTo(Screen.Dashboard.route)` cho Bottom Navigation
+
+**Ngày quyết định:** Tháng 4/2026
+**Trạng thái:** Được chấp nhận
+
+#### Bối cảnh
+Bottom navigation dùng `popUpTo(navController.graph.findStartDestination().id)` gây bug: nhấn tab Dashboard lại chuyển sang Transactions. Nguyên nhân: `findStartDestination()` trả về node Login (declared startDestination của graph), không phải Dashboard. Vì Login không còn trong back stack sau khi đăng nhập, `popUpTo` không pop gì cả, tạo back stack `[Dashboard, Transactions, Dashboard]`.
+
+#### Quyết định
+Dùng `popUpTo(Screen.Dashboard.route)` — route cụ thể của authenticated home — thay vì `findStartDestination()`.
+
+```kotlin
+navController.navigate(item.screen.route) {
+    popUpTo(Screen.Dashboard.route) { saveState = true }
+    launchSingleTop = true
+    restoreState = item.screen != Screen.Profile
+}
+```
+
+#### Lý do
+- Dashboard là "home" thực tế của authenticated flow, không phải Login
+- `restoreState = item.screen != Screen.Profile`: Profile tab không restore state để sub-screens (Categories, Budgets, Goals) được clear khi quay lại Profile
 
 ---
 

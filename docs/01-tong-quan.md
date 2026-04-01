@@ -1,8 +1,8 @@
 # 01 — Tổng Quan Xây Dựng
 
 > **Vai trò:** Người Quan Sát Xây Dựng
-> **Ngày:** 2026-03-30
-> **Phiên bản:** 1.0.0
+> **Ngày:** 2026-04-01
+> **Phiên bản:** 1.1.0
 
 ## Mô tả dự án
 
@@ -13,7 +13,8 @@ Pumiah Finance AI Manager Android là ứng dụng quản lý tài chính cá nh
 - Xem báo cáo tổng quan theo tháng
 - Đặt ngân sách theo danh mục và theo dõi mức chi tiêu
 - Tạo mục tiêu tiết kiệm và theo dõi tiến độ
-- Trò chuyện với AI Gemini để phân tích tài chính
+- Quản lý nhiều ví, bao gồm ví chung (shared wallet) với nhiều thành viên
+- Trò chuyện với AI Gemini để phân tích tài chính (hỗ trợ nhập bằng giọng nói)
 
 ## Cấu trúc thư mục
 
@@ -30,14 +31,14 @@ pumiah-finance-ai-manager-kotlin/
 │       │   ├── MainActivity.kt            # Entry point
 │       │   ├── data/
 │       │   │   ├── model/Models.kt        # Data classes + UiState
-│       │   │   └── repository/            # 7 repositories
+│       │   │   └── repository/            # 8 repositories
 │       │   ├── di/
 │       │   │   └── AppModule.kt          # Hilt DI providers
 │       │   ├── ui/
 │       │   │   ├── navigation/AppNavigation.kt
 │       │   │   ├── theme/Theme.kt
-│       │   │   └── screen/               # 9 screens
-│       │   └── viewmodel/                # 8 ViewModels
+│       │   │   └── screen/               # 10 screens
+│       │   └── viewmodel/                # 9 ViewModels
 │       └── res/
 │           ├── values/strings.xml
 │           ├── values/themes.xml
@@ -59,25 +60,38 @@ PumiahApplication (@HiltAndroidApp)
             │   └── AuthViewModel
             ├── [Auth] RegisterScreen
             │   └── AuthViewModel
-            └── [Main] Scaffold + NavigationBar
+            └── [Main] Scaffold + NavigationBar (5 tabs)
                 ├── DashboardScreen
                 │   └── DashboardViewModel
                 │       ├── SummaryCards
                 │       └── TransactionRow (x5)
                 ├── TransactionListScreen
                 │   └── TransactionViewModel
-                │       ├── TransactionItem (xN)
+                │       ├── TransactionItem (xN, badge email ký tự đầu)
                 │       └── TransactionFormDialog
                 ├── ChatScreen
                 │   └── ChatViewModel
-                │       └── ChatBubble (xN)
-                ├── BudgetScreen
-                │   └── BudgetViewModel
-                │       ├── BudgetItem (xN)
-                │       └── BudgetFormDialog
-                └── ProfileScreen
-                    ├── ProfileViewModel
-                    └── AuthViewModel
+                │       ├── ChatBubble (xN)
+                │       └── VoiceInput (RecognizerIntent)
+                ├── WalletScreen
+                │   └── WalletViewModel
+                │       ├── WalletCard (xN)
+                │       └── ManageWalletDialog
+                ├── ProfileScreen
+                │   ├── ProfileViewModel
+                │   └── AuthViewModel
+                │       ├── → CategoryScreen
+                │       │   └── CategoryViewModel
+                │       │       ├── CategoryItem (xN)
+                │       │       └── CategoryFormDialog (HSV picker + 50 icons)
+                │       ├── → BudgetScreen
+                │       │   └── BudgetViewModel
+                │       │       ├── BudgetItem (xN)
+                │       │       └── BudgetFormDialog
+                │       └── → GoalScreen
+                │           └── GoalViewModel
+                │               ├── GoalCard (xN)
+                │               └── ContributionDialog
 ```
 
 ## Luồng dữ liệu (Data Flow)
@@ -109,16 +123,21 @@ Recomposition → UI cập nhật
 | Thời điểm | Hoạt động |
 |-----------|-----------|
 | Phase 1 | Khởi tạo Gradle project, libs.versions.toml, app/build.gradle.kts |
-| Phase 2 | Tạo data layer: Models.kt, 7 Repositories |
+| Phase 2 | Tạo data layer: Models.kt, 8 Repositories |
 | Phase 3 | Tạo DI: AppModule.kt với Hilt |
-| Phase 4 | Tạo 8 ViewModels |
+| Phase 4 | Tạo 9 ViewModels |
 | Phase 5 | Tạo UI Theme, AppNavigation |
-| Phase 6 | Tạo 9 Compose Screens |
+| Phase 6 | Tạo 10 Compose Screens |
 | Phase 7 | Viết tài liệu tiếng Việt (9 file) |
+| Phase 8 | Fix & polish: session persistence, pull-to-refresh, voice chat, HSV color picker, 50 category icons, wallet screen, navigation bug fixes |
 
 ## Các quyết định quan trọng
 
-1. **Bỏ Wallet/Notification** ở MVP: Tính năng ví chung phức tạp (RLS nhiều bảng), để lại cho v2.
+1. **Wallet screen được thêm vào v1.1**: WalletViewModel + WalletRepository + WalletScreen với quản lý ví chung.
 2. **Gemini via HttpURLConnection**: Tránh dependency `google-generativeai` nặng (~10MB), dùng trực tiếp REST API.
 3. **Supabase URL hardcode**: URL không phải secret, chỉ ANON_KEY cần local.properties.
 4. **SUPABASE_URL trong BuildConfig**: Cho phép thay đổi môi trường mà không sửa code.
+5. **Session persistence qua `awaitSessionReady()`**: `SessionStatus.Initializing` check async thay vì `currentUserOrNull()` sync — giải quyết lỗi mất đăng nhập khi khởi động lại app.
+6. **Navigation `popUpTo(Screen.Dashboard.route)`**: Dùng route cụ thể thay vì `findStartDestination()` — tránh bug Login node nằm trên back stack khi đã đăng nhập.
+7. **HSV Color Picker bằng Canvas**: Không dùng dialog lồng nhau, picker inline trong CategoryFormDialog.
+8. **Voice input dùng `RecognizerIntent`**: Không cần thư viện ngoài, chỉ cần permission `RECORD_AUDIO`.

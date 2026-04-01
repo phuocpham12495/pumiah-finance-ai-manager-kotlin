@@ -1,8 +1,8 @@
 # 06 - Tài Liệu UI/UX Screens
 
 > **Vai trò:** Mentor Lập Trình Viên Cao Cấp
-> **Timestamp:** 2026-03-29
-> **Phiên bản tài liệu:** 1.0.0
+> **Timestamp:** 2026-04-01
+> **Phiên bản tài liệu:** 1.1.0
 
 ---
 
@@ -44,7 +44,7 @@ fun PumiahTheme(
 ### 2.1 Route Map
 
 ```kotlin
-// ui/navigation/Screen.kt
+// ui/navigation/AppNavigation.kt — sealed class Screen
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -55,93 +55,82 @@ sealed class Screen(val route: String) {
     object Goals : Screen("goals")
     object Chat : Screen("chat")
     object Profile : Screen("profile")
+    object Wallets : Screen("wallets")   // v1.1 — ví cá nhân + ví chung
 }
 ```
 
-### 2.2 Navigation Graph với Auth Guard
+### 2.2 Navigation Graph với Auth Guard (v1.1)
+
+Điểm khác biệt so với v1.0:
+- `sessionReady` StateFlow thay cho `LaunchedEffect(authState)` — tránh flash Login khi cold start
+- `startDestination` được xác định động (Dashboard nếu đã đăng nhập, Login nếu chưa)
+- `popUpTo(Screen.Dashboard.route)` thay vì `findStartDestination()` — tránh bug Login node
 
 ```kotlin
-// ui/navigation/AppNavigation.kt
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
-    val authState by authViewModel.authState.collectAsState()
+    val sessionReady by authViewModel.sessionReady.collectAsState()
 
-    // Auth Guard: tự động điều hướng dựa trên trạng thái đăng nhập
-    LaunchedEffect(authState) {
-        when (authState) {
-            is AuthState.Authenticated ->
-                navController.navigate(Screen.Dashboard.route) {
-                    popUpTo(Screen.Login.route) { inclusive = true }
-                }
-            is AuthState.Unauthenticated ->
-                navController.navigate(Screen.Login.route) {
-                    popUpTo(0) { inclusive = true }
-                }
-            else -> Unit // Loading state
+    // Splash indicator cho đến khi Supabase session khởi tạo xong
+    if (!sessionReady) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
+        return
     }
 
+    val startDestination = if (authViewModel.isLoggedIn) Screen.Dashboard.route else Screen.Login.route
+
     Scaffold(
-        bottomBar = {
-            // Chỉ hiện Bottom Nav khi đã đăng nhập
-            if (authState is AuthState.Authenticated) {
-                BottomNavigationBar(navController)
-            }
-        }
-    ) { paddingValues ->
+        bottomBar = { /* NavigationBar chỉ hiện trên 8 app screens */ }
+    ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Login.route,
-            modifier = Modifier.padding(paddingValues)
+            startDestination = startDestination,
+            modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Login.route) { LoginScreen(navController) }
-            composable(Screen.Register.route) { RegisterScreen(navController) }
-            composable(Screen.Dashboard.route) { DashboardScreen() }
+            composable(Screen.Login.route) { LoginScreen(...) }
+            composable(Screen.Register.route) { RegisterScreen(...) }
+            composable(Screen.Dashboard.route) { DashboardScreen(navController) }
             composable(Screen.Transactions.route) { TransactionListScreen() }
             composable(Screen.Categories.route) { CategoryScreen() }
             composable(Screen.Budgets.route) { BudgetScreen() }
             composable(Screen.Goals.route) { GoalScreen() }
             composable(Screen.Chat.route) { ChatScreen() }
-            composable(Screen.Profile.route) { ProfileScreen(navController) }
+            composable(Screen.Wallets.route) { WalletScreen() }
+            composable(Screen.Profile.route) {
+                ProfileScreen(
+                    onSignOut = { navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } } },
+                    onNavigateToCategories = { navController.navigate(Screen.Categories.route) },
+                    onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
+                    onNavigateToGoals = { navController.navigate(Screen.Goals.route) }
+                )
+            }
         }
     }
 }
 ```
 
-### 2.3 Bottom Navigation Bar
+### 2.3 Bottom Navigation Bar (v1.1)
+
+5 tabs: **Tổng quan · Giao dịch · AI Chat · Ví · Hồ sơ**
 
 ```kotlin
-@Composable
-fun BottomNavigationBar(navController: NavHostController) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+val bottomNavItems = listOf(
+    BottomNavItem(Screen.Dashboard, "Tổng quan") { Icon(Icons.Default.Home, null) },
+    BottomNavItem(Screen.Transactions, "Giao dịch") { Icon(Icons.Default.Receipt, null) },
+    BottomNavItem(Screen.Chat, "AI Chat") { Icon(Icons.Default.Chat, null) },
+    BottomNavItem(Screen.Wallets, "Ví") { Icon(Icons.Default.AccountBalanceWallet, null) },
+    BottomNavItem(Screen.Profile, "Hồ sơ") { Icon(Icons.Default.Person, null) },
+)
 
-    // Chỉ hiện trên 5 màn hình chính
-    val bottomNavScreens = listOf(
-        Screen.Dashboard, Screen.Transactions,
-        Screen.Budgets, Screen.Goals, Screen.Chat
-    )
-
-    NavigationBar {
-        bottomNavScreens.forEach { screen ->
-            NavigationBarItem(
-                icon = { Icon(getIconForScreen(screen), contentDescription = screen.route) },
-                label = { Text(getLabelForScreen(screen)) },
-                selected = currentRoute == screen.route,
-                onClick = {
-                    navController.navigate(screen.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
-        }
-    }
+// onClick — fix popUpTo bug (ADR-008)
+navController.navigate(item.screen.route) {
+    popUpTo(Screen.Dashboard.route) { saveState = true }
+    launchSingleTop = true
+    restoreState = item.screen != Screen.Profile  // Profile clear sub-screens
 }
 ```
 
@@ -637,76 +626,61 @@ fun GoalCard(goal: Goal, onContribute: () -> Unit) {
 
 ---
 
-## 8. ChatScreen + ChatBubble
+## 8. ChatScreen + ChatBubble (v1.1 — Voice Input)
 
-**Mục đích:** Chat với AI Gemini để nhận tư vấn tài chính.
+**Mục đích:** Chat với AI Gemini để nhận tư vấn tài chính. Hỗ trợ nhập văn bản và giọng nói tiếng Việt.
+
+**Quyền cần thiết:** `android.permission.RECORD_AUDIO` (AndroidManifest.xml)
 
 ```kotlin
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
-    val uiState by viewModel.uiState.collectAsState()
+    val messages by viewModel.messages.collectAsState()
+    val sendState by viewModel.sendState.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    // Auto-scroll xuống tin nhắn mới nhất
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    // Voice input launcher
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val text = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!text.isNullOrBlank()) inputText = text
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Danh sách tin nhắn
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(uiState.messages, key = { it.id }) { message ->
-                ChatBubble(message = message)
-            }
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("PFAM AI") }, actions = { /* Delete history */ }) },
+        bottomBar = {
+            Row(modifier = Modifier.padding(12.dp)) {
+                // Nút mic — khởi động Google Speech Recognition
+                IconButton(onClick = {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Nói câu hỏi của bạn...")
+                    }
+                    speechLauncher.launch(intent)
+                }) { Icon(Icons.Default.Mic, "Nhập giọng nói") }
 
-            // Loading indicator khi AI đang trả lời
-            if (uiState.isTyping) {
-                item {
-                    ChatBubble(
-                        message = Message(
-                            content = "...",
-                            isFromUser = false,
-                            isLoading = true
-                        )
-                    )
+                OutlinedTextField(value = inputText, onValueChange = { inputText = it }, ...)
+
+                // Nút gửi — disabled khi đang loading
+                IconButton(
+                    onClick = { viewModel.sendMessage(inputText); inputText = "" },
+                    enabled = inputText.isNotBlank() && sendState !is UiState.Loading
+                ) {
+                    if (sendState is UiState.Loading) CircularProgressIndicator(...)
+                    else Icon(Icons.Default.Send, null)
                 }
             }
         }
-
-        // Input row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = { Text("Hỏi về tài chính của bạn...") },
-                modifier = Modifier.weight(1f),
-                maxLines = 3
-            )
-            Spacer(Modifier.width(8.dp))
-            IconButton(
-                onClick = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.sendMessage(inputText)
-                        inputText = ""
-                    }
-                },
-                enabled = !uiState.isTyping && inputText.isNotBlank()
-            ) {
-                Icon(Icons.Filled.Send, "Gửi")
-            }
+    ) { padding ->
+        LazyColumn(state = listState, ...) {
+            items(messages, key = { it.id }) { msg -> ChatBubble(msg) }
         }
     }
 }
