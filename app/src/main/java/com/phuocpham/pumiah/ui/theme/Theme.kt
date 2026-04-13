@@ -29,10 +29,30 @@ private val LightColors = lightColorScheme(
     onSurface = Color(0xFF2D3436),
 )
 
+private val DarkColors = darkColorScheme(
+    primary = LightPurple,
+    onPrimary = Color(0xFF1A1A2E),
+    primaryContainer = Purple,
+    onPrimaryContainer = Color.White,
+    secondary = Teal,
+    onSecondary = Color(0xFF0A1F1F),
+    tertiary = Blue,
+    error = Red,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E2E),
+    surfaceVariant = Color(0xFF2A2A3A),
+    onBackground = Color(0xFFE8E8EA),
+    onSurface = Color(0xFFE8E8EA),
+    onSurfaceVariant = Color(0xFFB8B8C0),
+)
+
 @Composable
-fun PumiahTheme(content: @Composable () -> Unit) {
+fun PumiahTheme(
+    darkTheme: Boolean = false,
+    content: @Composable () -> Unit
+) {
     MaterialTheme(
-        colorScheme = LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         content = content
     )
 }

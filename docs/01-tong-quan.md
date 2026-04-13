@@ -1,8 +1,8 @@
 # 01 — Tổng Quan Xây Dựng
 
 > **Vai trò:** Người Quan Sát Xây Dựng
-> **Ngày:** 2026-04-01
-> **Phiên bản:** 1.1.0
+> **Ngày:** 2026-04-05
+> **Phiên bản:** 1.2.0
 
 ## Mô tả dự án
 
@@ -130,6 +130,7 @@ Recomposition → UI cập nhật
 | Phase 6 | Tạo 10 Compose Screens |
 | Phase 7 | Viết tài liệu tiếng Việt (9 file) |
 | Phase 8 | Fix & polish: session persistence, pull-to-refresh, voice chat, HSV color picker, 50 category icons, wallet screen, navigation bug fixes |
+| Phase 9 | Thêm Chế độ tối (Dark Mode) với ThemeManager Singleton + Switch ở Profile |
 
 ## Các quyết định quan trọng
 
@@ -141,3 +142,4 @@ Recomposition → UI cập nhật
 6. **Navigation `popUpTo(Screen.Dashboard.route)`**: Dùng route cụ thể thay vì `findStartDestination()` — tránh bug Login node nằm trên back stack khi đã đăng nhập.
 7. **HSV Color Picker bằng Canvas**: Không dùng dialog lồng nhau, picker inline trong CategoryFormDialog.
 8. **Voice input dùng `RecognizerIntent`**: Không cần thư viện ngoài, chỉ cần permission `RECORD_AUDIO`.
+9. **Chế độ tối qua `ThemeManager` Singleton + SharedPreferences**: Không dùng DataStore để tránh I/O async khi đọc config khởi động; chọn SharedPreferences sync để theme áp dụng ngay từ `setContent`. ProfileScreen dùng `EntryPointAccessors` để lấy instance (do composable không phải ViewModel).

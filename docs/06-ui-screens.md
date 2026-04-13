@@ -1,8 +1,8 @@
 # 06 - Tài Liệu UI/UX Screens
 
 > **Vai trò:** Mentor Lập Trình Viên Cao Cấp
-> **Timestamp:** 2026-04-01
-> **Phiên bản tài liệu:** 1.1.0
+> **Timestamp:** 2026-04-05
+> **Phiên bản tài liệu:** 1.2.0
 
 ---
 
@@ -10,30 +10,72 @@
 
 Ứng dụng sử dụng **Jetpack Compose** với **Material Design 3** hoàn toàn. Không có Fragment hay XML layout. Toàn bộ UI được xây dựng bằng Composable functions.
 
-### 1.1 Theme Configuration
+### 1.1 Theme Configuration (v1.2 — Dark Mode toggle)
+
+App hỗ trợ chế độ sáng/tối với toggle thủ công ở màn hình Hồ sơ. Trạng thái được lưu qua `ThemeManager` (SharedPreferences-backed Singleton).
 
 ```kotlin
 // ui/theme/Theme.kt
+private val LightColors = lightColorScheme(
+    primary = Purple,
+    background = Color(0xFFF8F9FA),
+    surface = Color.White,
+    // ...
+)
+
+private val DarkColors = darkColorScheme(
+    primary = LightPurple,
+    onPrimary = Color(0xFF1A1A2E),
+    primaryContainer = Purple,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E2E),
+    surfaceVariant = Color(0xFF2A2A3A),
+    onBackground = Color(0xFFE8E8EA),
+    onSurface = Color(0xFFE8E8EA),
+    // ...
+)
+
 @Composable
 fun PumiahTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,  // MD3 Dynamic Color
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(LocalContext.current)
-            else dynamicLightColorScheme(LocalContext.current)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         content = content
     )
+}
+```
+
+### 1.2 ThemeManager (Singleton)
+
+```kotlin
+// data/preferences/ThemeManager.kt
+@Singleton
+class ThemeManager @Inject constructor(
+    @ApplicationContext context: Context
+) {
+    private val prefs = context.getSharedPreferences("pumiah_theme", Context.MODE_PRIVATE)
+    private val _darkMode = MutableStateFlow(prefs.getBoolean("dark_mode", false))
+    val darkMode: StateFlow<Boolean> = _darkMode
+
+    fun setDarkMode(enabled: Boolean) {
+        prefs.edit().putBoolean("dark_mode", enabled).apply()
+        _darkMode.value = enabled
+    }
+}
+
+// MainActivity.kt
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+    @Inject lateinit var themeManager: ThemeManager
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            val darkMode by themeManager.darkMode.collectAsState()
+            PumiahTheme(darkTheme = darkMode) { AppNavigation() }
+        }
+    }
 }
 ```
 
@@ -782,7 +824,80 @@ if (transaction.createdByEmail != null) {
 
 ---
 
-## 9b. ProfileScreen
+## 9b. ProfileScreen (v1.2 — Dark Mode Switcher)
+
+**Mục đích:** Hiển thị thông tin cá nhân, quản lý hồ sơ, chuyển chế độ tối/sáng, điều hướng đến Categories/Budgets/Goals, đăng xuất.
+
+**Thứ tự các thành phần dưới avatar/info:**
+1. Divider
+2. **Hàng "Chế độ tối"** với icon Sun/Moon + `Switch` (mới trong v1.2)
+3. Nút "Quản lý danh mục"
+4. Nút "Ngân sách"
+5. Nút "Mục tiêu tiết kiệm"
+6. Nút "Đăng xuất"
+
+### Dark Mode Switcher
+
+```kotlin
+// ProfileScreen.kt — EntryPoint để lấy ThemeManager vì composable không @Inject được
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ThemeManagerEntryPoint {
+    fun themeManager(): ThemeManager
+}
+
+@Composable
+fun ProfileScreen(...) {
+    val context = LocalContext.current
+    val themeManager = remember(context) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            ThemeManagerEntryPoint::class.java
+        ).themeManager()
+    }
+    val darkMode by themeManager.darkMode.collectAsState()
+
+    // ... avatar, info, update form ...
+
+    HorizontalDivider()
+    Spacer(Modifier.height(16.dp))
+
+    // Hàng toggle chế độ tối — đặt trên "Quản lý danh mục"
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (darkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = "Chế độ tối",
+            modifier = Modifier.weight(1f),
+            fontWeight = FontWeight.Medium
+        )
+        Switch(
+            checked = darkMode,
+            onCheckedChange = { themeManager.setDarkMode(it) }
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedButton(onClick = onNavigateToCategories, ...) { Text("Quản lý danh mục") }
+    // ...
+}
+```
+
+**Cách hoạt động:**
+- Icon tự đổi theo trạng thái (`LightMode` khi sáng, `DarkMode` khi tối)
+- Toggle gọi `themeManager.setDarkMode(it)` — StateFlow emit → MainActivity recompose → `PumiahTheme` đổi color scheme toàn app tức thời
+- Trạng thái lưu vào SharedPreferences, giữ nguyên qua restart app
+
+---
+
+## 9c. ProfileScreen (chi tiết đầy đủ)
 
 **Mục đích:** Hiển thị và chỉnh sửa thông tin cá nhân, đăng xuất.
 
@@ -1031,9 +1146,9 @@ Màn hình hiển thị `CircularProgressIndicator` trong khi `walletsLoading = 
 | Wallet screen + shared wallets | **Đã implement** |
 | Offline support | Chưa implement |
 | Accessibility (content descriptions) | Một phần |
-| Dark mode | Đã implement (MD3 dynamic color) |
+| Dark mode (toggle thủ công qua ThemeManager) | **Đã implement v1.2** |
 | Landscape orientation | Cơ bản |
 
 ---
 
-*Tài liệu này được cập nhật bởi Mentor Lập Trình Viên Cao Cấp - 2026-04-01*
+*Tài liệu này được cập nhật bởi Mentor Lập Trình Viên Cao Cấp - 2026-04-05*

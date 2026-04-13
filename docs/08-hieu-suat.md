@@ -1,8 +1,8 @@
 # 08 - Hiệu Năng, Bảo Mật và Kế Hoạch Sprint
 
 > **Vai trò:** Kỹ Sư Hiệu Năng + Quản Lý Dự Án
-> **Timestamp:** 2026-04-01
-> **Phiên bản tài liệu:** 1.1.0
+> **Timestamp:** 2026-04-05
+> **Phiên bản tài liệu:** 1.2.0
 
 ---
 
@@ -348,7 +348,8 @@ fun validateTransaction(
 | Wallet loading guard (walletsLoading) | 3 | **Hoàn thành** |
 | Fix remove participant ví chung | 2 | **Hoàn thành** |
 | App name → "Pumiah Finance AI Manager" | 1 | **Hoàn thành** |
-| **Tổng** | **47** | **100%** |
+| Dark Mode với Switch ở Profile | 5 | **Hoàn thành** |
+| **Tổng** | **52** | **100%** |
 
 ### 4.5 Sprint 5: Testing & Release (Tuần 9-10)
 
@@ -432,4 +433,4 @@ class PumiahApplication : Application() {
 
 ---
 
-*Tài liệu này được cập nhật bởi Kỹ Sư Hiệu Năng + Quản Lý Dự Án - 2026-04-01*
+*Tài liệu này được cập nhật bởi Kỹ Sư Hiệu Năng + Quản Lý Dự Án - 2026-04-05*

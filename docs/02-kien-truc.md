@@ -1,8 +1,8 @@
 # 02 - Kiểm Toán Kiến Trúc: Pumiah Finance AI Manager
 
 > **Vai trò:** Kiểm Toán Kiến Trúc
-> **Timestamp:** 2026-04-01
-> **Phiên bản tài liệu:** 1.1.0
+> **Timestamp:** 2026-04-05
+> **Phiên bản tài liệu:** 1.2.0
 
 ---
 
@@ -394,6 +394,80 @@ navController.navigate(item.screen.route) {
 #### Lý do
 - Dashboard là "home" thực tế của authenticated flow, không phải Login
 - `restoreState = item.screen != Screen.Profile`: Profile tab không restore state để sub-screens (Categories, Budgets, Goals) được clear khi quay lại Profile
+
+---
+
+### ADR-009: Dark Mode qua `ThemeManager` Singleton + SharedPreferences
+
+**Ngày quyết định:** Tháng 4/2026
+**Trạng thái:** Được chấp nhận
+
+#### Bối cảnh
+Người dùng yêu cầu chế độ tối với Switch ở màn hình Hồ sơ. Theme phải được áp dụng ngay từ lần render đầu tiên (không flash light mode), giữ nguyên qua restart app, và cập nhật tức thời khi toggle.
+
+#### Quyết định
+Tạo `ThemeManager` là Hilt `@Singleton` với:
+- `StateFlow<Boolean>` cho trạng thái dark mode
+- SharedPreferences để persist (sync read — không blocking vì một boolean nhỏ)
+- `MainActivity` `@Inject ThemeManager`, `collectAsState()`, truyền vào `PumiahTheme(darkTheme)`
+- `ProfileScreen` dùng `EntryPointAccessors.fromApplication(...)` để lấy instance vì composable không hỗ trợ `@Inject` trực tiếp
+
+```kotlin
+// ThemeManager.kt
+@Singleton
+class ThemeManager @Inject constructor(
+    @ApplicationContext context: Context
+) {
+    private val prefs = context.getSharedPreferences("pumiah_theme", Context.MODE_PRIVATE)
+    private val _darkMode = MutableStateFlow(prefs.getBoolean(KEY_DARK_MODE, false))
+    val darkMode: StateFlow<Boolean> = _darkMode
+
+    fun setDarkMode(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DARK_MODE, enabled).apply()
+        _darkMode.value = enabled
+    }
+}
+
+// MainActivity.kt
+@Inject lateinit var themeManager: ThemeManager
+setContent {
+    val darkMode by themeManager.darkMode.collectAsState()
+    PumiahTheme(darkTheme = darkMode) { AppNavigation() }
+}
+
+// ProfileScreen.kt — EntryPoint vì composable không @Inject được
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ThemeManagerEntryPoint {
+    fun themeManager(): ThemeManager
+}
+
+val themeManager = remember(context) {
+    EntryPointAccessors.fromApplication(
+        context.applicationContext, ThemeManagerEntryPoint::class.java
+    ).themeManager()
+}
+```
+
+#### Lý do chọn SharedPreferences thay vì DataStore
+- DataStore API là suspend/Flow — cần coroutine để đọc lần đầu → có thể gây flash light mode trước khi value emit
+- Boolean đơn giản, không cần migration, không cần type-safe proto schema
+- SharedPreferences `getBoolean()` sync, trả về ngay — theme áp dụng từ render đầu tiên
+
+#### Lý do chọn EntryPointAccessors
+- Composable không phải ViewModel, không dùng `@HiltViewModel` được
+- `hiltViewModel()` không phù hợp vì ThemeManager không phải ViewModel
+- `EntryPointAccessors.fromApplication()` là pattern chính thức của Hilt cho trường hợp này
+
+#### Hệ quả
+- Trạng thái theme nằm ngoài scope ViewModel — hợp lý vì là app-wide setting
+- Toggle cập nhật tức thời vì StateFlow trigger recomposition toàn bộ tree qua MainActivity
+- File mới: `data/preferences/ThemeManager.kt`
+
+#### Thay thế đã xem xét
+- **DataStore Preferences:** Flow API tốt hơn cho observability, nhưng async read gây flash
+- **System dark mode (isSystemInDarkTheme()):** Không cho phép user override — không đáp ứng yêu cầu
+- **Material Dynamic Color:** Chỉ hoạt động Android 12+, không đáp ứng toggle thủ công
 
 ---
 

@@ -1,8 +1,8 @@
 # 09 - Tiến Độ Học Tập và Phát Triển Kỹ Năng
 
 > **Vai trò:** Điều Phối Viên Giáo Dục
-> **Timestamp:** 2026-04-01
-> **Phiên bản tài liệu:** 1.1.0
+> **Timestamp:** 2026-04-05
+> **Phiên bản tài liệu:** 1.2.0
 
 ---
 
@@ -391,8 +391,8 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
 ```json
 {
   "project": "pumiah-finance-ai-manager-kotlin",
-  "lastUpdated": "2026-04-01",
-  "overallProgress": 85,
+  "lastUpdated": "2026-04-05",
+  "overallProgress": 87,
 
   "concepts": {
     "MVVM": {
@@ -446,6 +446,16 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
       "understanding": 75,
       "implementation": 72,
       "notes": "RecognizerIntent for voice input. ActivityResultContracts.StartActivityForResult pattern learned."
+    },
+    "HiltEntryPoints": {
+      "understanding": 78,
+      "implementation": 75,
+      "notes": "EntryPointAccessors.fromApplication() used to inject ThemeManager into Composable (composables can't @Inject directly)."
+    },
+    "ThemingAndDarkMode": {
+      "understanding": 80,
+      "implementation": 82,
+      "notes": "Material3 darkColorScheme + lightColorScheme. Toggle persisted via SharedPreferences + StateFlow. Why SharedPrefs over DataStore: sync read avoids flash on cold start."
     }
   },
 
@@ -463,7 +473,7 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
   },
 
   "completedFeatures": {
-    "count": 23,
+    "count": 24,
     "list": [
       "Authentication (Login/Register/Logout)",
       "Session Persistence across restarts (awaitSessionReady)",
@@ -487,7 +497,8 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
       "Manage shared wallet participants (add/remove)",
       "Profile Screen",
       "Navigation with Bottom Bar (5 tabs)",
-      "Navigation bugs fixed (popUpTo, Profile restoreState)"
+      "Navigation bugs fixed (popUpTo, Profile restoreState)",
+      "Dark Mode toggle (ThemeManager Singleton + SharedPreferences)"
     ]
   },
 
@@ -599,7 +610,9 @@ Thêm tính năng giao dịch định kỳ (lương hàng tháng, tiền thuê n
 1. **HttpURLConnection cho Gemini** — không thêm dependency nặng, kiểm soát hoàn toàn request, YAGNI principle.
 2. **`sessionStatus.first { it !is SessionStatus.Initializing }`** — dùng Flow operator để chờ async event, không dùng polling/delay.
 3. **`restoreState = item.screen != Screen.Profile`** — giải quyết Category tab persist chỉ bằng một dòng logic.
+4. **SharedPreferences cho Dark Mode thay vì DataStore** — chọn đúng công cụ: DataStore async có thể gây flash theme khi cold start, SharedPreferences sync read cho boolean là lựa chọn đơn giản và đúng mục đích.
+5. **`EntryPointAccessors` cho ThemeManager trong Composable** — nhận ra `hiltViewModel()` không phù hợp (ThemeManager không phải ViewModel), dùng pattern chính thức của Hilt thay vì workaround như passing qua CompositionLocal thủ công.
 
 ---
 
-*Tài liệu này được cập nhật bởi Điều Phối Viên Giáo Dục - 2026-04-01*
+*Tài liệu này được cập nhật bởi Điều Phối Viên Giáo Dục - 2026-04-05*

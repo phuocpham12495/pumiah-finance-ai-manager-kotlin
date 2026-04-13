@@ -10,7 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,8 +32,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.phuocpham.pumiah.data.model.UiState
+import com.phuocpham.pumiah.data.preferences.ThemeManager
 import com.phuocpham.pumiah.viewmodel.AuthViewModel
 import com.phuocpham.pumiah.viewmodel.ProfileViewModel
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ThemeManagerEntryPoint {
+    fun themeManager(): ThemeManager
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +57,13 @@ fun ProfileScreen(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val themeManager = remember(context) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            ThemeManagerEntryPoint::class.java
+        ).themeManager()
+    }
+    val darkMode by themeManager.darkMode.collectAsState()
     val profileState by profileViewModel.profile.collectAsState()
     val updateState by profileViewModel.updateState.collectAsState()
     val avatarUploadState by profileViewModel.avatarUploadState.collectAsState()
@@ -194,6 +214,28 @@ fun ProfileScreen(
             Spacer(Modifier.height(32.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (darkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "Chế độ tối",
+                    modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.Medium
+                )
+                Switch(
+                    checked = darkMode,
+                    onCheckedChange = { themeManager.setDarkMode(it) }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
 
             OutlinedButton(onClick = onNavigateToCategories, modifier = Modifier.fillMaxWidth()) {
                 Text("Quản lý danh mục")
