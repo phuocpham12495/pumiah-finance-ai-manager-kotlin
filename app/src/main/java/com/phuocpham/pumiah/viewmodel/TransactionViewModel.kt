@@ -42,6 +42,13 @@ class TransactionViewModel @Inject constructor(
     private val _saveState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val saveState: StateFlow<UiState<Unit>> = _saveState
 
+    // Week-based filter: 0 = current week, -1 = previous, +1 = next. Week starts Sunday.
+    private val _weekOffset = MutableStateFlow(0)
+    val weekOffset: StateFlow<Int> = _weekOffset
+
+    fun shiftWeek(delta: Int) { _weekOffset.value += delta }
+    fun resetWeek() { _weekOffset.value = 0 }
+
     val currentUserId: String? get() = authRepository.currentUser?.id
 
     init { loadWalletsAndAll() }

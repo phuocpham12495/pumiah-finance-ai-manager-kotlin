@@ -8,9 +8,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -26,15 +29,40 @@ import com.phuocpham.pumiah.data.model.Category
 import com.phuocpham.pumiah.data.model.Transaction
 import com.phuocpham.pumiah.data.model.UiState
 import com.phuocpham.pumiah.data.model.Wallet
+import com.phuocpham.pumiah.ui.screen.category.iconVectorFor
 import com.phuocpham.pumiah.ui.theme.Green
 import com.phuocpham.pumiah.ui.theme.Red
 import com.phuocpham.pumiah.ui.utils.formatVndSigned
 import com.phuocpham.pumiah.viewmodel.DashboardViewModel
 import com.phuocpham.pumiah.viewmodel.TransactionViewModel
+import androidx.core.graphics.toColorInt
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
+
+private val weekRangeFmt = DateTimeFormatter.ofPattern("dd/MM")
+
+private fun weekRangeFor(offset: Int): Pair<LocalDate, LocalDate> {
+    val today = LocalDate.now()
+    val thisSunday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+    val start = thisSunday.plusWeeks(offset.toLong())
+    val end = start.plusDays(6)
+    return start to end
+}
+
+private fun weekLabel(offset: Int): String {
+    val (start, end) = weekRangeFor(offset)
+    val prefix = when (offset) {
+        0 -> "Tuần này"
+        -1 -> "Tuần trước"
+        1 -> "Tuần sau"
+        else -> if (offset < 0) "${-offset} tuần trước" else "$offset tuần sau"
+    }
+    return "$prefix • ${start.format(weekRangeFmt)} – ${end.format(weekRangeFmt)}"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +80,7 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
 
     val selectedWalletId by viewModel.selectedWalletId.collectAsState()
     var expandedWalletFilter by remember { mutableStateOf(false) }
+    val weekOffset by viewModel.weekOffset.collectAsState()
 
     // Filter state (client-side)
     var searchQuery by remember { mutableStateOf("") }
@@ -124,6 +153,34 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
                         }
                     }
                 }
+                // Week navigation
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(onClick = { viewModel.shiftWeek(-1) }) {
+                        Icon(Icons.Default.ChevronLeft, "Tuần trước")
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)) {
+                        Text(weekLabel(weekOffset),
+                            fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface)
+                        if (weekOffset != 0) {
+                            TextButton(onClick = { viewModel.resetWeek() },
+                                modifier = Modifier.height(24.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                                Icon(Icons.Default.Today, null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Về tuần này", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    IconButton(onClick = { viewModel.shiftWeek(1) }) {
+                        Icon(Icons.Default.ChevronRight, "Tuần sau")
+                    }
+                }
                 // Search field
                 OutlinedTextField(
                     value = searchQuery,
@@ -168,15 +225,24 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
             when (val state = transactionsState) {
                 is UiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 is UiState.Success -> {
-                    val filtered = state.data.filter { t ->
-                        (typeFilter == "all" || t.type == typeFilter) &&
-                        (categoryFilter == null || t.categoryId == categoryFilter) &&
-                        (searchQuery.isBlank() || t.notes?.contains(searchQuery, ignoreCase = true) == true)
-                    }
+                    val (weekStart, weekEnd) = weekRangeFor(weekOffset)
+                    val filtered = state.data
+                        .filter { t ->
+                            val d = runCatching { LocalDate.parse(t.transactionDate.take(10)) }.getOrNull()
+                            val inWeek = d != null && !d.isBefore(weekStart) && !d.isAfter(weekEnd)
+                            inWeek &&
+                            (typeFilter == "all" || t.type == typeFilter) &&
+                            (categoryFilter == null || t.categoryId == categoryFilter) &&
+                            (searchQuery.isBlank() || t.notes?.contains(searchQuery, ignoreCase = true) == true)
+                        }
+                        .sortedByDescending { it.transactionDate }
                     if (filtered.isEmpty()) {
                         Box(Modifier.fillMaxSize(), Alignment.Center) {
                             Text(
-                                if (state.data.isEmpty()) "Chưa có giao dịch nào" else "Không tìm thấy giao dịch",
+                                when {
+                                    state.data.isEmpty() -> "Chưa có giao dịch nào"
+                                    else -> "Không có giao dịch trong tuần này"
+                                },
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                         }
@@ -246,43 +312,74 @@ fun TransactionListScreen(viewModel: TransactionViewModel = hiltViewModel()) {
 fun TransactionItem(transaction: Transaction, canEditDelete: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
     val isIncome = transaction.type == "income"
     val amountColor = if (isIncome) Green else Red
+    val category = transaction.category
+    val categoryColor = remember(category?.color) {
+        runCatching { Color(category?.color?.toColorInt() ?: 0xFF6C5CE7.toInt()) }.getOrDefault(Color(0xFF6C5CE7))
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // 1. Category icon (left) in color-tinted circle
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(categoryColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = iconVectorFor(category?.icon ?: "attach_money"),
+                    contentDescription = null,
+                    tint = categoryColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+
+            // 2. Initial badge (center, gray circle) — chỉ hiện cho giao dịch ví chung
+            if (transaction.createdByEmail != null) {
+                val initial = transaction.createdByEmail.first().uppercaseChar()
+                Box(
+                    modifier = Modifier.size(28.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = initial.toString(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+            }
+
+            // 3. Text column (flex)
             Column(modifier = Modifier.weight(1f)) {
-                Text(transaction.category?.name ?: "—", fontWeight = FontWeight.Medium)
+                Text(category?.name ?: "—", fontWeight = FontWeight.Medium)
                 if (!transaction.notes.isNullOrBlank())
-                    Text(transaction.notes, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(transaction.transactionDate.take(10), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    if (transaction.walletId != null) {
-                        val walletLabel = transaction.walletName ?: "Ví chung"
-                        Text("• $walletLabel", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                    }
-                    if (transaction.createdByEmail != null) {
-                        val initial = transaction.createdByEmail.first().uppercaseChar()
-                        Box(
-                            modifier = Modifier.size(16.dp).clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initial.toString(),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
+                    Text(transaction.notes, fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Text(transaction.transactionDate.take(10), fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+
+            // 4. Right column: amount (top) + wallet name (below)
+            Column(horizontalAlignment = Alignment.End) {
+                Text(formatVndSigned(transaction.amount, isIncome),
+                    color = amountColor, fontWeight = FontWeight.SemiBold)
+                if (transaction.walletId != null) {
+                    val walletLabel = transaction.walletName ?: "Ví chung"
+                    Text(walletLabel, fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
                 }
             }
-            Text(formatVndSigned(transaction.amount, isIncome),
-                color = amountColor, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = 8.dp))
+
             if (canEditDelete) {
+                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp))
                 }
             }
         }
